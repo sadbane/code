@@ -6,6 +6,7 @@ import random
 import config
 import time
 import datetime
+import json
 
 user_tokens = {}
 
@@ -237,7 +238,7 @@ def handle_channel(call):
             break
     channel_menu_keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
     subscribe_button = telebot.types.InlineKeyboardButton(text='Подписаться', url='https://t.me/' + channel_name[1:])
-    check_subscription_button = telebot.types.InlineKeyboardButton(text='Проверить подписку', callback_data=f'check_{channel_name}')
+    check_subscription_button = telebot.types.InlineKeyboardButton(text='Проверить подписку', callback_data='check_subscription')
     back_button = telebot.types.InlineKeyboardButton(text='Назад', callback_data='back')
     channel_menu_keyboard.add(subscribe_button, check_subscription_button, back_button)
     bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
@@ -249,7 +250,7 @@ def handle_check_subscription(call):
     chat_id = call.message.chat.id
     message_id = call.message.message_id
     today = datetime.today().strftime("%Y-%m-%d")
-    channels = [    {'name': 'Live Genshin Impact', 'username': '@LiveGenshinImpact'},    
+    channel = [    {'name': 'Live Genshin Impact', 'username': '@LiveGenshinImpact'},    
             {'name': 'Kanal2', 'username': '@onlinegenshinimpact'},
             {'name': 'svegak', 'username': '@ccddcssdc'}]
     for channel in channels:
@@ -264,7 +265,7 @@ def handle_check_subscription(call):
                     else:
                         user_tokens[user_id][channel['name']] += 1
                 bot.answer_callback_query(callback_query_id=call.id, text=f'Вы подписались на канал "{channel["name"]}". За это начислен 1 жетон.')
-                cur.execute(f"UPDATE users SET tokens = tokens + 1 WHERE user_id = '{user_id}'")
+                cursor.execute(f"UPDATE users SET tokens = tokens + 1 WHERE user_id = '{user_id}'")
                 conn.commit()
             else:
                 bot.answer_callback_query(callback_query_id=call.id, text=f'Для получения жетона вы должны подписаться на канал "{channel["name"]}".')
