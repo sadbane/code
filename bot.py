@@ -7,6 +7,7 @@ import config
 import time
 import datetime
 
+user_tokens = {}
 
 # Создаем словарь для хранения времени последнего использования команды для каждого пользователя
 last_command_time = {}
@@ -208,7 +209,10 @@ def get_channels_keyboard():
     return keyboard
 
 
-channels = [{'name': 'Live Genshin Impact', 'username': '@LiveGenshinImpact', 'name': 'Kanal2', 'username': '@onlinegenshinimpact'}]
+channels = [    {'name': 'Live Genshin Impact', 'username': '@LiveGenshinImpact'},    
+            {'name': 'Kanal2', 'username': '@onlinegenshinimpact'},
+            {'name': 'svegak', 'username': '@ccddcssdc'}]
+
 
 def get_channels_keyboard():
     keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
@@ -239,28 +243,46 @@ def handle_channel(call):
     bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
                           text=f'Вы выбрали канал {channel_title}. Что вы хотите сделать?', reply_markup=channel_menu_keyboard)
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith('check_'))
+@bot.callback_query_handler(func=lambda call: call.data == 'check_subscription')
 def handle_check_subscription(call):
-    channel_name = call.data.split('_')[1]
-    chat = bot.get_chat(channel_name)
-    chat_member = bot.get_chat_member(chat.id, call.from_user.id)
-    if chat_member.status == 'member' or chat_member.status == 'administrator' or chat_member.status == 'creator':
-        today = datetime.datetime.today().strftime("%Y-%m-%d")
-        user_id = call.from_user.id
-        cursor.execute('SELECT tokens FROM user_stats WHERE user_id=?', (user_id,))
-        row = cursor.fetchone()
-        if row is None:
-            tokens = 0
-        else:
-            tokens = row[0]
-        if tokens == 0:
-            cursor.execute('INSERT OR REPLACE INTO user_stats(user_id, tokens) VALUES (?, ?)', (user_id, 1))
-            conn.commit()
-            bot.send_message(call.message.chat.id, f'Поздравляю! Вы получили 1 токен за подписку на канал {channel_name}.')
-        else:
-            bot.send_message(call.message.chat.id, 'Сегодня вы уже получили токен за подписку на канал.')
+    user_id = call.message.chat.id
+    chat_id = call.message.chat.id
+    message_id = call.message.message_id
+    today = datetime.today().strftime("%Y-%m-%d")
+    channels = [    {'name': 'Live Genshin Impact', 'username': '@LiveGenshinImpact'},    
+            {'name': 'Kanal2', 'username': '@onlinegenshinimpact'},
+            {'name': 'svegak', 'username': '@ccddcssdc'}]
+    for channel in channels:
+        try:
+            status = bot.get_chat_member(channel['username'], user_id).status
+            if status == 'member':
+                if user_id not in user_tokens:
+                    user_tokens[user_id] = {channel['name']: 1}
+                else:
+                    if channel['name'] not in user_tokens[user_id]:
+                        user_tokens[user_id][channel['name']] = 1
+                    else:
+                        user_tokens[user_id][channel['name']] += 1
+                bot.answer_callback_query(callback_query_id=call.id, text=f'Вы подписались на канал "{channel["name"]}". За это начислен 1 жетон.')
+                cur.execute(f"UPDATE users SET tokens = tokens + 1 WHERE user_id = '{user_id}'")
+                conn.commit()
+            else:
+                bot.answer_callback_query(callback_query_id=call.id, text=f'Для получения жетона вы должны подписаться на канал "{channel["name"]}".')
+        except Exception as e:
+            print(e)
+            bot.answer_callback_query(callback_query_id=call.id, text=f'Произошла ошибка при проверке подписки на канал "{channel["name"]}".')
+
+    # Сохранение жетонов пользователя
+    with open('user_tokens.json', 'w') as f:
+        json.dump(user_tokens, f)
+
+    # Отправка сообщения с подсчетом жетонов пользователя
+    if user_id in user_tokens:
+        token_count = sum(user_tokens[user_id].values())
+        bot.send_message(chat_id, f'У вас {token_count} жетонов.')
     else:
-        bot.send_message(call.message.chat.id, f'Вы не подписаны на канал {channel_name}. Пожалуйста, подпишитесь и повторите попытку позже.')
+        bot.send_message(chat_id, 'У вас нет жетонов.')
+    bot.edit_message_reply_markup(chat_id=chat_id, message_id=message_id, reply_markup=None)
 
 # Обработчик кнопки "Назад" в меню канала
 @bot.callback_query_handler(func=lambda call: call.data == 'back')
