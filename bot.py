@@ -263,7 +263,7 @@ def handle_back_button(call):
 def get_main_keyboard():
     keyboard = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True)
     keyboard.row('Моя статистика 📈', 'Крутить Автомат! 🎰')
-    keyboard.row('Получить жетоны 💰')
+    keyboard.row('Подпишись на каналы')
     return keyboard
 
 
