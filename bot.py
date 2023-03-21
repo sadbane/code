@@ -210,17 +210,11 @@ def get_channels_keyboard():
     return keyboard
 
 
-channels = [    {'name': 'Live Genshin Impact', 'username': '@LiveGenshinImpact'},    
-            {'name': 'Kanal2', 'username': '@onlinegenshinimpact'},
-            {'name': 'svegak', 'username': '@ccddcssdc'}]
-
-
-def get_channels_keyboard():
-    keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-    for channel in channels:
-        channel_button = telebot.types.InlineKeyboardButton(text=channel['name'], callback_data=f'channel_{channel["username"]}')
-        keyboard.add(channel_button)
-    return keyboard
+channels = [
+    {'name': 'Live Genshin Impact', 'username': '@LiveGenshinImpact'},
+    {'name': 'Kanal2', 'username': '@onlinegenshinimpact'},
+    {'name': 'svegak', 'username': '@ccddcssdc'}
+]
 
 
 # Обработчик команды "Получить жетоны"
@@ -229,6 +223,7 @@ def handle_get_tokens(message):
     channels_keyboard = get_channels_keyboard()
     bot.send_message(message.chat.id, 'Выберите канал:', reply_markup=channels_keyboard)
 
+
 @bot.callback_query_handler(func=lambda call: call.data.startswith('channel_'))
 def handle_channel(call):
     channel_name = call.data.split('_')[1]
@@ -236,54 +231,26 @@ def handle_channel(call):
         if channel['username'] == channel_name:
             channel_title = channel['name']
             break
+
+    # Проверяем, подписан ли пользователь на канал
+    chat_member = bot.get_chat_member(channel_name, call.message.chat.id)
+    if chat_member.status == 'member' or chat_member.status == 'creator':
+        subscribed = True
+    else:
+        subscribed = False
+
     channel_menu_keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-    subscribe_button = telebot.types.InlineKeyboardButton(text='Подписаться', url='https://t.me/' + channel_name[1:])
-    check_subscription_button = telebot.types.InlineKeyboardButton(text='Проверить подписку', callback_data='check_subscription')
+    if subscribed:
+        check_subscription_button = telebot.types.InlineKeyboardButton(text='Проверить подписку ✅', callback_data='check_subscription')
+    else:
+        subscribe_button = telebot.types.InlineKeyboardButton(text='Подписаться 🔔', url='https://t.me/' + channel_name[1:])
+        check_subscription_button = telebot.types.InlineKeyboardButton(text='Проверить подписку ❌', callback_data='check_subscription')
+        channel_menu_keyboard.add(subscribe_button)
     back_button = telebot.types.InlineKeyboardButton(text='Назад', callback_data='back')
-    channel_menu_keyboard.add(subscribe_button, check_subscription_button, back_button)
+    channel_menu_keyboard.add(check_subscription_button, back_button)
     bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
                           text=f'Вы выбрали канал {channel_title}. Что вы хотите сделать?', reply_markup=channel_menu_keyboard)
 
-@bot.callback_query_handler(func=lambda call: call.data == 'check_subscription')
-def handle_check_subscription(call):
-    user_id = call.message.chat.id
-    chat_id = call.message.chat.id
-    message_id = call.message.message_id
-    today = datetime.today().strftime("%Y-%m-%d")
-    channel = [    {'name': 'Live Genshin Impact', 'username': '@LiveGenshinImpact'},    
-            {'name': 'Kanal2', 'username': '@onlinegenshinimpact'},
-            {'name': 'svegak', 'username': '@ccddcssdc'}]
-    for channel in channels:
-        try:
-            status = bot.get_chat_member(channel['username'], user_id).status
-            if status == 'member':
-                if user_id not in user_tokens:
-                    user_tokens[user_id] = {channel['name']: 1}
-                else:
-                    if channel['name'] not in user_tokens[user_id]:
-                        user_tokens[user_id][channel['name']] = 1
-                    else:
-                        user_tokens[user_id][channel['name']] += 1
-                bot.answer_callback_query(callback_query_id=call.id, text=f'Вы подписались на канал "{channel["name"]}". За это начислен 1 жетон.')
-                cursor.execute(f"UPDATE users SET tokens = tokens + 1 WHERE user_id = '{user_id}'")
-                conn.commit()
-            else:
-                bot.answer_callback_query(callback_query_id=call.id, text=f'Для получения жетона вы должны подписаться на канал "{channel["name"]}".')
-        except Exception as e:
-            print(e)
-            bot.answer_callback_query(callback_query_id=call.id, text=f'Произошла ошибка при проверке подписки на канал "{channel["name"]}".')
-
-    # Сохранение жетонов пользователя
-    with open('user_tokens.json', 'w') as f:
-        json.dump(user_tokens, f)
-
-    # Отправка сообщения с подсчетом жетонов пользователя
-    if user_id in user_tokens:
-        token_count = sum(user_tokens[user_id].values())
-        bot.send_message(chat_id, f'У вас {token_count} жетонов.')
-    else:
-        bot.send_message(chat_id, 'У вас нет жетонов.')
-    bot.edit_message_reply_markup(chat_id=chat_id, message_id=message_id, reply_markup=None)
 
 # Обработчик кнопки "Назад" в меню канала
 @bot.callback_query_handler(func=lambda call: call.data == 'back')
